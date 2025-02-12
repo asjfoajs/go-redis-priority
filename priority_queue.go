@@ -22,9 +22,6 @@ var popScript string
 //go:embed lua/countBefore.lua
 var countBeforeScript string
 
-////go:embed lua/pull.lua
-//var pullScript string
-
 const (
 	// Redis Key 常量定义
 	KeyLevelSuffix    = "{%s}:%d"        // 优先级队列层级键格式
