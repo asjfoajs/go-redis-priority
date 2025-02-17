@@ -1,6 +1,6 @@
 package main
 
-// CalculatePrefixSum 传入 counts 数组，返回累积和数组
+// CalculatePrefixSum 前缀和算法，传入 counts 数组，返回累积和数组
 func CalculatePrefixSum(counts []int64) []int64 {
 	n := len(counts)
 	prefix := make([]int64, n)
