@@ -128,7 +128,7 @@ func TestCountBefore(t *testing.T) {
 	}
 
 	// 这里的逻辑根据实现可能会返回非 0 值，但应满足 elemB 的 countBefore 大于 elemA 的
-	if countB <= countA || countC <= countD || countD <= countC {
+	if countB <= countA || countC <= countB || countD <= countC {
 		t.Errorf("Expected CountBefore(elemB) > CountBefore(elemA) && CountBefore(elemC) > CountBefore(elemD), but got CountBefore(elemB) = %d, CountBefore(elemA) = %d, CountBefore(elemC) = %d, CountBefore(elemD) = %d", countB, countA, countC, countD)
 	}
 
