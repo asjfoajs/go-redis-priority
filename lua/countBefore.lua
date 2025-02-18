@@ -43,10 +43,4 @@ else
     count = ((count - headCount) + maxCount) % maxCount
 end
 
-local total = count
-for i = 2, level do
-    total = total + redis.call("LLEN", KEYS[i+1])
-end
-
-
-return total
+return {count,level-1}

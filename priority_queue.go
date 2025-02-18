@@ -3,12 +3,13 @@ package main
 
 import (
 	"context"
+	_ "embed"
 	"encoding/json"
 	"errors"
 	"fmt"
-
-	_ "embed"
 	"github.com/redis/go-redis/v9"
+	"math"
+	"sync/atomic"
 )
 
 // 内嵌 Lua 脚本
@@ -22,8 +23,11 @@ var popScript string
 //go:embed lua/countBefore.lua
 var countBeforeScript string
 
+//go:embed lua/len.lua
+var lenScript string
+
 const (
-	// Redis Key 常量定义
+	// KeyLevelSuffix Redis Key 常量定义
 	KeyLevelSuffix    = "{%s}:%d"        // 优先级队列层级键格式
 	KeyCountSuffix    = "{%s}:count:%d"  // 计数器键格式
 	KeyCountMapSuffix = "{%s}:count_map" // 计数映射表键格式
@@ -33,24 +37,33 @@ const (
 
 // PriorityQueue 表示基于 Redis 的优先级队列
 type PriorityQueue struct {
-	client   *redis.Client // Redis 客户端实例
-	baseKey  string        // 队列基础键名
-	levels   []string      // 各优先级层级的键名
-	maxLevel int64         // 最大优先级层级
+	client         *redis.Client // Redis 客户端实例
+	baseKey        string        // 队列基础键名
+	levels         []string      // 各优先级层级的键名
+	maxLevel       int64         // 最大优先级层级
+	levelsCount    []int64       // 每个优先级队列的计数
+	pushCount      int64         //最近有多少数据push
+	popCount       int64         //最近有多少数据pop
+	thresholdCount int64         //超过阈值进行更新
+	updater        *Updater
 }
 
 // NewPriorityQueue 创建新的优先级队列实例
-func NewPriorityQueue(client *redis.Client, baseKey string, maxLevel int64) *PriorityQueue {
+func NewPriorityQueue(baseKey string, maxLevel, regular, everyTime, thresholdCount int64, client *redis.Client) *PriorityQueue {
 	pq := &PriorityQueue{
-		client:   client,
-		baseKey:  baseKey,
-		maxLevel: maxLevel,
-		levels:   make([]string, maxLevel),
+		client:         client,
+		baseKey:        baseKey,
+		maxLevel:       maxLevel,
+		levels:         make([]string, maxLevel),
+		thresholdCount: thresholdCount,
 	}
 	// 初始化各层级队列键名
 	for i := int64(0); i < maxLevel; i++ {
 		pq.levels[i] = fmt.Sprintf(KeyLevelSuffix, baseKey, i+1)
 	}
+
+	//定时刷新各层级计数器==>
+	pq.updater = NewUpdater(regular, everyTime, pq.CheckRefresh, pq.RefreshLevelsCount)
 	return pq
 }
 
@@ -98,6 +111,9 @@ func (pq *PriorityQueue) Push(level int64, elem Element) error {
 
 	// 使用 Eval 调用 push.lua 脚本
 	_, err = pq.client.Eval(ctx, pushScript, keys, argv...).Result()
+
+	atomic.AddInt64(&pq.pushCount, 1)
+
 	return err
 }
 
@@ -131,6 +147,9 @@ func (pq *PriorityQueue) Pop() (*Element, error) {
 	if err := json.Unmarshal([]byte(data), &elem); err != nil {
 		return nil, fmt.Errorf("unmarshal error: %w", err)
 	}
+
+	atomic.AddInt64(&pq.popCount, 1)
+
 	return &elem, nil
 }
 
@@ -149,22 +168,49 @@ func (pq *PriorityQueue) CountBefore(elemID string) (int64, error) {
 		fmt.Sprintf("%d", MaxCount),
 	}
 
-	res, err := pq.client.Eval(ctx, countBeforeScript, keys, argv...).Result()
+	res, err := pq.client.Eval(ctx, countBeforeScript, keys, argv...).Int64Slice()
 	if err != nil {
 		return -1, err
 	}
-	// 返回结果应为数值
-	switch v := res.(type) {
-	case int64:
-		return v, nil
-	case float64:
-		return int64(v), nil
-	default:
-		return -1, fmt.Errorf("unexpected type %T", res)
+
+	if len(res) != 2 {
+		return -1, fmt.Errorf("two values are expected to be returned, which are actually returned: %v", res)
 	}
+
+	countVal := res[0]
+	levelVal := res[1]
+
+	if levelVal <= 0 {
+		return countVal, nil
+	}
+
+	return countVal + pq.levelsCount[levelVal-1], nil
 }
 
 // Pull 延迟删除元素
 func (pq *PriorityQueue) Pull(elemID string) error {
 	return pq.client.HDel(context.Background(), pq.countMapKey(), elemID).Err()
+}
+
+// RefreshLevelsCount 刷新各层级计数器
+func (pq *PriorityQueue) RefreshLevelsCount() error {
+	ctx := context.Background()
+	res, err := pq.client.Eval(ctx, lenScript, pq.levels).Int64Slice()
+	if err != nil {
+		return fmt.Errorf("eval error: %v", err)
+	}
+
+	if res == nil {
+		return nil
+	}
+
+	//刷新完之后清空值
+	pq.levelsCount = CalculatePrefixSum(res)
+	pq.pushCount = 0
+	pq.popCount = 0
+	return nil
+}
+
+func (pq *PriorityQueue) CheckRefresh() bool {
+	return float64(atomic.LoadInt64(&pq.thresholdCount)) < math.Abs(float64(atomic.LoadInt64(&pq.pushCount)-atomic.LoadInt64(&pq.popCount)))
 }
