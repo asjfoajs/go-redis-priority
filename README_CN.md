@@ -25,14 +25,18 @@ func newTestClient() *redis.Client {
 
 ```
 
-2. 添加元素
-
+2. 创建优先级队列
 ```go
 client := newTestClient()
 baseKey := "test:queue:pushpop"
 // 创建 3 个优先级层级（级别从 1 到 3）
-pq := NewPriorityQueue(client, baseKey, 3)
+pq := NewPriorityQueue(baseKey, 3, 5, 1, 10, client)
+defer pq.Stop()
+```
 
+3. 添加元素
+
+```go
 // 定义测试元素
 elemA := Element{ID: "a", Value: "A-value"}
 
@@ -42,7 +46,7 @@ if err := pq.Push(1, elemA); err != nil {
 }
 ```
 
-3. 获取当前用户前面还有多少人排队
+4. 获取当前用户前面还有多少人排队
 
 ```go
 countA, err := pq.CountBefore("a")
@@ -51,7 +55,7 @@ if err != nil {
 }
 ```
 
-4. 删除
+5. 删除
 
 ```go
 elem, err := pq.Pop()
@@ -60,7 +64,7 @@ if err != nil {
 }
 ```
 
-5. 获取队头元素并删除
+6. 获取队头元素并删除
 
 ```go
 if err := pq.Pull("a"); err != nil {

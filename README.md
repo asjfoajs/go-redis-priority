@@ -25,14 +25,18 @@ func newTestClient() *redis.Client {
 }
 ```
 
-2. **Add an Element**
-
+2. **Create a Priority Queue**
 ```go
 client := newTestClient()
 baseKey := "test:queue:pushpop"
-// Create 3 priority levels (levels 1 through 3)
-pq := NewPriorityQueue(client, baseKey, 3)
+// 创建 3 个优先级层级（级别从 1 到 3）
+pq := NewPriorityQueue(baseKey, 3, 5, 1, 10, client)
+defer pq.Stop()
+```
 
+3. **Add an Element**
+
+```go
 // Define a test element
 elemA := Element{ID: "a", Value: "A-value"}
 
@@ -42,7 +46,7 @@ if err := pq.Push(1, elemA); err != nil {
 }
 ```
 
-3. **Get the Number of People Ahead of the Current User**
+4. **Get the Number of People Ahead of the Current User**
 
 ```go
 countA, err := pq.CountBefore("a")
@@ -51,7 +55,7 @@ if err != nil {
 }
 ```
 
-4. **Delete**
+5. **Delete**
 
 ```go
 elem, err := pq.Pop()
@@ -60,7 +64,7 @@ if err != nil {
 }
 ```
 
-5. **Get and Remove the Head Element**
+6. **Get and Remove the Head Element**
 
 ```go
 if err := pq.Pull("a"); err != nil {

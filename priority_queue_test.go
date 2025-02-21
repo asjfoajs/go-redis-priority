@@ -30,6 +30,7 @@ func TestPushPop(t *testing.T) {
 	baseKey := "test:queue:pushpop"
 	// 创建 3 个优先级层级（级别从 1 到 3）
 	pq := NewPriorityQueue(baseKey, 3, 5, 1, 10, client)
+	defer pq.Stop()
 
 	// 定义测试元素
 	elemA := Element{ID: "a", Value: "A-value"}
@@ -83,6 +84,7 @@ func TestCountBefore(t *testing.T) {
 	client := newTestClient()
 	baseKey := "test:queue:countbefore"
 	pq := NewPriorityQueue(baseKey, 3, 5, 1, 10, client)
+	defer pq.Stop()
 
 	// 测试在多个优先级中插入多个元素时 CountBefore 的值
 	elemA := Element{ID: "a", Value: "A-value"}
@@ -144,6 +146,7 @@ func TestPull(t *testing.T) {
 	client := newTestClient()
 	baseKey := "test:queue:pull"
 	pq := NewPriorityQueue(baseKey, 3, 5, 1, 10, client)
+	defer pq.Stop()
 
 	elemA := Element{ID: "a", Value: "A-value"}
 
