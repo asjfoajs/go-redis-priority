@@ -29,7 +29,7 @@ func newTestClient() *redis.Client {
 ```go
 client := newTestClient()
 baseKey := "test:queue:pushpop"
-// 创建 3 个优先级层级（级别从 1 到 3）
+// Create three priority levels (levels 1 through 3)
 pq := NewPriorityQueue(baseKey, 3, 5, 1, 10, client)
 defer pq.Stop()
 ```
