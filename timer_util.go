@@ -8,7 +8,7 @@ import (
 type Updater struct {
 	regularTime   time.Duration //timer 的间隔时间
 	everyTime     time.Duration //在定时里多长时间检测一次是否超过阈值
-	timer         *time.Timer
+	timer         *time.Timer   //定时器
 	triggerUpdate chan struct{} // 触发立即更新的通道
 	stopChan      chan struct{} // 停止信号
 }

@@ -45,7 +45,7 @@ type PriorityQueue struct {
 	pushCount      int64         //最近有多少数据push
 	popCount       int64         //最近有多少数据pop
 	thresholdCount int64         //超过阈值进行更新
-	updater        *Updater
+	updater        *Updater      //定时器更新前缀和数组
 }
 
 // NewPriorityQueue 创建新的优先级队列实例
@@ -211,6 +211,12 @@ func (pq *PriorityQueue) RefreshLevelsCount() error {
 	return nil
 }
 
+// CheckRefresh 检查是否需要刷新
 func (pq *PriorityQueue) CheckRefresh() bool {
 	return float64(atomic.LoadInt64(&pq.thresholdCount)) < math.Abs(float64(atomic.LoadInt64(&pq.pushCount)-atomic.LoadInt64(&pq.popCount)))
+}
+
+// Stop 关闭定时器
+func (pq *PriorityQueue) Stop() {
+	pq.updater.Stop()
 }
